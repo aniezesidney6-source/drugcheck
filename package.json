@@ -1,0 +1,24 @@
+{
+  "name": "drugcheck-nigeria",
+  "version": "2.0.0",
+  "description": "WhatsApp drug verification bot for Nigeria",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "nodemon app.js",
+    "scrape": "node scripts/scrapeNAFDAC.js",
+    "test": "node tests/test_standalone.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.0.0",
+    "express": "^4.18.0",
+    "node-cron": "^3.0.3",
+    "twilio": "^4.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
