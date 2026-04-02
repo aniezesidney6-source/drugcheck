@@ -149,9 +149,12 @@ router.post('/', async (req, res) => {
         let msg = `🏥 *Nearest Pharmacies to You*\n\n`;
         pharmacies.forEach((p, i) => {
           msg += `*${i + 1}. ${p.name}*\n`;
-          if (p.address) msg += `📍 ${p.address}\n`;
+          msg += `📍 ${p.address || 'Address not available'}\n`;
           if (p.distance) msg += `📏 ${p.distance}\n`;
-          if (p.rating) msg += `⭐ ${p.rating}\n`;
+          if (p.phone) msg += `📞 ${p.phone}\n`;
+          if (p.rating) msg += `⭐ ${p.rating}/5\n`;
+          if (p.open_now === true) msg += `🟢 Open now\n`;
+          if (p.open_now === false) msg += `🔴 Closed now\n`;
           msg += `\n`;
         });
         msg += `To rate: *RATE PHARMACY [number] [1-5] [comment]*`;
