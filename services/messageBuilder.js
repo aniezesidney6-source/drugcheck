@@ -1,148 +1,90 @@
 /**
  * messageBuilder.js
- * Centralizes all bot response messages for easy editing.
- * Keeps the WhatsApp replies short and clear for everyday Nigerians.
+ * Builds WhatsApp messages for DrugCheck Nigeria
  */
 
-/**
- * Welcome / onboarding message shown when a new user says "Hi", "Hello", etc.
- * @returns {string}
- */
 function welcomeMessage() {
-  return (
-    "👋 Welcome to *DrugCheck Nigeria* 💊\n\n" +
-    "I help you verify if a drug is registered with NAFDAC.\n\n" +
-    "📌 *How to use:*\n" +
-    "Send your NAFDAC registration number.\n" +
-    "Example: *A4-1234*\n\n" +
-    "⚠️ This service is for verification only.\n" +
-    "It is not medical advice.\n\n" +
-    "Type *HELP* for more commands."
-  );
+  return `👋 Welcome to *DrugCheck Nigeria* 💊🇳🇬
+
+I help you verify if a drug is registered with NAFDAC.
+
+*What I can do:*
+📋 Type a NAFDAC number e.g. *A4-1234*
+📸 Send a *photo* of the medicine label
+💊 Type a drug name e.g. *Amoxicillin*
+🚨 Type *FAKE DRUG* to report suspicious medicine
+🏥 Type *PHARMACY* to find nearby pharmacies
+
+⚠️ This service is for verification only. It is not medical advice.
+
+Type *HELP* for full command guide.`;
 }
 
-/**
- * Help message explaining all supported commands.
- * @returns {string}
- */
 function helpMessage() {
-  return (
-    "🆘 *DrugCheck Nigeria — Help*\n\n" +
-    "Here's what you can do:\n\n" +
-    "1️⃣ *Send a NAFDAC number* to verify a drug.\n" +
-    "   Example: A4-1234\n\n" +
-    "2️⃣ Type *HELP* to see this menu.\n\n" +
-    "3️⃣ Type *REPORT [NAFDAC No]* to report a suspicious drug.\n" +
-    "   Example: REPORT X0-9999\n\n" +
-    "📞 For emergencies, call NAFDAC: 0800-162-3322\n\n" +
-    "⚠️ Always buy drugs from licensed pharmacies."
-  );
+  return `📖 *DrugCheck Nigeria — Full Guide*
+
+*VERIFY A DRUG:*
+• Type NAFDAC number e.g. *C4-0984*
+• Send a 📸 photo of the medicine label
+• Type drug name e.g. *Paracetamol*
+
+*REPORT FAKE DRUG:*
+• Type *FAKE DRUG* — I'll guide you step by step
+
+*FIND PHARMACY:*
+• Type *PHARMACY* — then share your location
+
+*COMMUNITY RATINGS:*
+• *RATINGS A4-1234* — see ratings for a drug
+• *RATE DRUG A4-1234 5 Works great* — rate a drug
+• *RATE PHARMACY 1 4 Good service* — rate a pharmacy
+
+*OTHER:*
+• *REPORT A4-1234* — report suspicious NAFDAC number
+• *HELP* — show this guide
+• *CANCEL* — cancel current action
+
+📞 NAFDAC Hotline: *0800-162-3322* (toll-free)
+🌐 nafdac.gov.ng`;
 }
 
-/**
- * Response for a VERIFIED drug.
- * @param {object} drug - The drug object from the database
- * @returns {string}
- */
-function verifiedMessage(drug) {
-  return (
-    "✅ *DRUG VERIFIED*\n\n" +
-    `💊 Drug: ${drug.drug_name}\n` +
-    `🔖 NAFDAC No: ${drug.nafdac_no}\n` +
-    `🏭 Manufacturer: ${drug.manufacturer}\n` +
-    `💉 Form: ${drug.dosage_form} — ${drug.strength}\n` +
-    `📊 Status: *VERIFIED ✅*\n\n` +
-    "✔️ This drug is registered with NAFDAC.\n" +
-    "Always buy from a licensed pharmacy."
-  );
+function verifiedMessage(drug, ratings) {
+  let msg = `✅ *VERIFIED DRUG*\n\n`;
+  msg += `💊 *${drug.drug_name || 'Unknown'}*\n`;
+  if (drug.active_ingredient) msg += `🔬 Ingredient: ${drug.active_ingredient}\n`;
+  if (drug.form) msg += `💉 Form: ${drug.form}\n`;
+  if (drug.strength) msg += `⚖️ Strength: ${drug.strength}\n`;
+  if (drug.applicant) msg += `🏭 Manufacturer: ${drug.applicant}\n`;
+  msg += `🔖 NAFDAC No: ${drug.nafdac_no}\n`;
+  msg += `\n✅ *This drug is registered with NAFDAC*\n`;
+
+  if (ratings && ratings.count > 0) {
+    msg += `\n⭐ Community Rating: ${ratings.average}/5 (${ratings.count} votes)`;
+  }
+
+  msg += `\n\n_To rate this drug: RATE DRUG ${drug.nafdac_no} [1-5] [comment]_`;
+  return msg;
 }
 
-/**
- * Response for a drug NOT FOUND in the database.
- * @param {string} nafdacNo - The normalized NAFDAC number the user sent
- * @returns {string}
- */
 function notFoundMessage(nafdacNo) {
-  return (
-    "⚠️ *DRUG NOT FOUND*\n\n" +
-    `🔖 NAFDAC No: ${nafdacNo}\n` +
-    `📊 Status: *NOT FOUND ⚠️*\n\n` +
-    "This number is not in our database.\n\n" +
-    "❗ *Do not use this drug* until you confirm it.\n\n" +
-    "📞 Contact NAFDAC: 0800-162-3322\n" +
-    "Or visit: www.nafdac.gov.ng"
-  );
+  return `❌ *NOT FOUND IN DATABASE*\n\n` +
+    `NAFDAC No: *${nafdacNo}* is not in our database.\n\n` +
+    `*This could mean:*\n` +
+    `• The drug is not registered with NAFDAC\n` +
+    `• The number was entered incorrectly\n` +
+    `• It may be a counterfeit drug\n\n` +
+    `⚠️ *Do not use this drug until verified.*\n\n` +
+    `📞 Contact NAFDAC: *0800-162-3322*\n` +
+    `🚨 To report: type *FAKE DRUG*`;
 }
 
-/**
- * Response for a SUSPICIOUS drug.
- * @param {object} drug - The suspicious drug object from the database
- * @returns {string}
- */
 function suspiciousMessage(drug) {
-  return (
-    "❌ *SUSPICIOUS DRUG DETECTED*\n\n" +
-    `🔖 NAFDAC No: ${drug.nafdac_no}\n` +
-    `📊 Status: *SUSPICIOUS ❌*\n\n` +
-    "⛔ This drug may be fake or unregistered.\n\n" +
-    "*Do NOT use it.*\n\n" +
-    "📢 Report it by sending:\n" +
-    `REPORT ${drug.nafdac_no}\n\n` +
-    "📞 Call NAFDAC: 0800-162-3322"
-  );
+  return `⚠️ *SUSPICIOUS DRUG*\n\n` +
+    `💊 *${drug.drug_name || 'Unknown'}*\n` +
+    `🔖 NAFDAC No: ${drug.nafdac_no}\n\n` +
+    `⚠️ This drug has been flagged as suspicious by the community.\n\n` +
+    `📞 Contact NAFDAC: *0800-162-3322*\n` +
+    `🚨 To report: type *FAKE DRUG*`;
 }
 
-/**
- * Response for an invalid NAFDAC format.
- * @param {string} rawInput - What the user originally sent
- * @returns {string}
- */
-function invalidFormatMessage(rawInput) {
-  return (
-    "❓ *Invalid Format*\n\n" +
-    `You sent: "${rawInput}"\n\n` +
-    "A NAFDAC number looks like: *A4-1234*\n" +
-    "(One or two letters, a number, a dash, then digits)\n\n" +
-    "Please check the number on your drug pack and try again.\n\n" +
-    "Type *HELP* if you need assistance."
-  );
-}
-
-/**
- * Confirmation message after a user submits a report.
- * @param {string} nafdacNo - The reported NAFDAC number
- * @returns {string}
- */
-function reportReceivedMessage(nafdacNo) {
-  return (
-    "📢 *Report Received*\n\n" +
-    `NAFDAC No: ${nafdacNo || "not provided"}\n\n` +
-    "Thank you for helping keep Nigeria safe! 🇳🇬\n" +
-    "Your report has been saved for review.\n\n" +
-    "📞 You can also call NAFDAC: 0800-162-3322"
-  );
-}
-
-/**
- * Fallback message for unrecognized input that isn't a NAFDAC number.
- * @returns {string}
- */
-function fallbackMessage() {
-  return (
-    "🤔 I didn't understand that.\n\n" +
-    "To check a drug, send its *NAFDAC number*.\n" +
-    "Example: *A4-1234*\n\n" +
-    "Type *HELP* to see all commands."
-  );
-}
-
-module.exports = {
-  welcomeMessage,
-  helpMessage,
-  verifiedMessage,
-  notFoundMessage,
-  suspiciousMessage,
-  invalidFormatMessage,
-  reportReceivedMessage,
-  fallbackMessage,
-};
+module.exports = { welcomeMessage, helpMessage, verifiedMessage, notFoundMessage, suspiciousMessage };
