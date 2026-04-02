@@ -26,14 +26,14 @@ async function sendMessage(to, body) {
   });
 }
 
-// Helper — uses the real lookupDrug function which returns { status, drug, normalizedNo }
 function findDrug(nafdacNo) {
   const result = drugLookup.lookupDrug(nafdacNo);
-  return result && result.status === 'verified' ? result.drug : null;
+  return result && result.drug ? result.drug : null;
 }
 
 router.post('/', async (req, res) => {
-  res.sendStatus(200);
+  // CRITICAL: respond immediately with empty 200 so Twilio doesn't send "OK"
+  res.status(200).end();
 
   const from = req.body.From;
   const body = (req.body.Body || '').trim();
@@ -42,9 +42,7 @@ router.post('/', async (req, res) => {
 
   try {
 
-    // ─────────────────────────────────────────
-    // 📸 IMAGE — AI Vision Verification
-    // ─────────────────────────────────────────
+    // IMAGE — AI Vision Verification
     if (numMedia > 0) {
       const imageUrl = req.body.MediaUrl0;
       await sendMessage(from, '🔍 Scanning your medicine image, please wait...');
@@ -57,11 +55,11 @@ router.post('/', async (req, res) => {
             `Or type the number directly e.g. *A4-1234*`
           );
         } else {
-          const result = drugLookup.lookupDrug(nafdacNo);
+          const drug = findDrug(nafdacNo);
           const ratings = ratingService.getRatings(nafdacNo);
           await sendMessage(from,
             `📸 *Detected NAFDAC No:* ${nafdacNo}\n\n` +
-            (result && result.drug ? verifiedMessage(result.drug, ratings) : notFoundMessage(nafdacNo))
+            (drug ? verifiedMessage(drug, ratings) : notFoundMessage(nafdacNo))
           );
         }
       } catch (e) {
@@ -71,9 +69,7 @@ router.post('/', async (req, res) => {
       return;
     }
 
-    // ─────────────────────────────────────────
-    // 🔄 MULTI-STEP: FAKE DRUG REPORT FLOW
-    // ─────────────────────────────────────────
+    // MULTI-STEP: FAKE DRUG REPORT FLOW
     if (session.state === STATES.FAKE_REPORT_DRUG) {
       setState(from, STATES.FAKE_REPORT_PHARMACY, { drugName: body });
       await sendMessage(from, `💊 Drug: *${body}*\n\nWhich pharmacy or shop sold you this drug?\n_(Type the pharmacy name)_`);
@@ -102,11 +98,7 @@ router.post('/', async (req, res) => {
       return;
     }
 
-    // ─────────────────────────────────────────
-    // 📝 TEXT COMMANDS
-    // ─────────────────────────────────────────
-    const upper = body.toUpperCase();
-
+    // TEXT COMMANDS
     if (/^(CANCEL|STOP|EXIT)$/i.test(body)) {
       clearSession(from);
       await sendMessage(from, `✅ Cancelled. Send *HELP* to see what I can do.`);
@@ -171,14 +163,14 @@ router.post('/', async (req, res) => {
       return;
     }
 
-    const rateDrugMatch = upper.match(/^RATE DRUG ([A-Z0-9]{1,4}-\d{2,7}[A-Z]?) ([1-5])\s*(.*)?$/);
+    const rateDrugMatch = body.toUpperCase().match(/^RATE DRUG ([A-Z0-9]{1,4}-\d{2,7}[A-Z]?) ([1-5])\s*(.*)?$/);
     if (rateDrugMatch) {
       ratingService.addDrugRating(rateDrugMatch[1], parseInt(rateDrugMatch[2]), rateDrugMatch[3] || '', from);
       await sendMessage(from, `✅ Your ${rateDrugMatch[2]}⭐ rating for *${rateDrugMatch[1]}* has been saved. Thank you! 🇳🇬`);
       return;
     }
 
-    const ratePharmMatch = upper.match(/^RATE PHARMACY (\d+) ([1-5])\s*(.*)?$/);
+    const ratePharmMatch = body.toUpperCase().match(/^RATE PHARMACY (\d+) ([1-5])\s*(.*)?$/);
     if (ratePharmMatch) {
       const idx = parseInt(ratePharmMatch[1]) - 1;
       const pharmacies = userLastPharmacies[from];
@@ -191,7 +183,7 @@ router.post('/', async (req, res) => {
       return;
     }
 
-    const ratingsMatch = upper.match(/^RATINGS ([A-Z0-9]{1,4}-\d{2,7}[A-Z]?)$/);
+    const ratingsMatch = body.toUpperCase().match(/^RATINGS ([A-Z0-9]{1,4}-\d{2,7}[A-Z]?)$/);
     if (ratingsMatch) {
       const ratings = ratingService.getRatings(ratingsMatch[1]);
       if (!ratings || ratings.count === 0) {
@@ -205,7 +197,7 @@ router.post('/', async (req, res) => {
       return;
     }
 
-    const reportMatch = upper.match(/^REPORT ([A-Z0-9]{1,4}-\d{2,7}[A-Z]?)/);
+    const reportMatch = body.toUpperCase().match(/^REPORT ([A-Z0-9]{1,4}-\d{2,7}[A-Z]?)/);
     if (reportMatch) {
       reportService.addReport(reportMatch[1], from);
       await sendMessage(from, `🚨 Report logged for *${reportMatch[1]}*.\n📞 Also call NAFDAC: *0800-162-3322*\n\nThank you 🇳🇬`);
@@ -216,11 +208,9 @@ router.post('/', async (req, res) => {
     const nafdacMatch = body.match(/([A-Z0-9]{1,4}-\d{2,7}[A-Z]?)/i);
     if (nafdacMatch) {
       const nafdacNo = nafdacMatch[1].toUpperCase();
-      const result = drugLookup.lookupDrug(nafdacNo);
+      const drug = findDrug(nafdacNo);
       const ratings = ratingService.getRatings(nafdacNo);
-      await sendMessage(from,
-        result && result.drug ? verifiedMessage(result.drug, ratings) : notFoundMessage(nafdacNo)
-      );
+      await sendMessage(from, drug ? verifiedMessage(drug, ratings) : notFoundMessage(nafdacNo));
       return;
     }
 
