@@ -32,7 +32,6 @@ function findDrug(nafdacNo) {
 }
 
 router.post('/', async (req, res) => {
-  // CRITICAL: respond immediately with empty 200 so Twilio doesn't send "OK"
   res.status(200).end();
 
   const from = req.body.From;
@@ -56,7 +55,7 @@ router.post('/', async (req, res) => {
           );
         } else {
           const drug = findDrug(nafdacNo);
-          const ratings = ratingService.getRatings(nafdacNo);
+          const ratings = ratingService.getDrugRatingSummary(nafdacNo);
           await sendMessage(from,
             `📸 *Detected NAFDAC No:* ${nafdacNo}\n\n` +
             (drug ? verifiedMessage(drug, ratings) : notFoundMessage(nafdacNo))
@@ -163,40 +162,51 @@ router.post('/', async (req, res) => {
       return;
     }
 
+    // RATE DRUG — e.g. RATE DRUG A4-1234 5 Great product
     const rateDrugMatch = body.toUpperCase().match(/^RATE DRUG ([A-Z0-9]{1,4}-\d{2,7}[A-Z]?) ([1-5])\s*(.*)?$/);
     if (rateDrugMatch) {
-      ratingService.addDrugRating(rateDrugMatch[1], parseInt(rateDrugMatch[2]), rateDrugMatch[3] || '', from);
-      await sendMessage(from, `✅ Your ${rateDrugMatch[2]}⭐ rating for *${rateDrugMatch[1]}* has been saved. Thank you! 🇳🇬`);
+      const nafdacNo = rateDrugMatch[1];
+      const stars = parseInt(rateDrugMatch[2]);
+      const comment = rateDrugMatch[3] || '';
+      ratingService.rateDrug(from, nafdacNo, stars, comment);
+      await sendMessage(from, `✅ Your ${stars}⭐ rating for *${nafdacNo}* has been saved. Thank you! 🇳🇬`);
       return;
     }
 
+    // RATE PHARMACY — e.g. RATE PHARMACY 1 5 Great service
     const ratePharmMatch = body.toUpperCase().match(/^RATE PHARMACY (\d+) ([1-5])\s*(.*)?$/);
     if (ratePharmMatch) {
       const idx = parseInt(ratePharmMatch[1]) - 1;
+      const stars = parseInt(ratePharmMatch[2]);
+      const comment = ratePharmMatch[3] || '';
       const pharmacies = userLastPharmacies[from];
       if (!pharmacies || !pharmacies[idx]) {
         await sendMessage(from, `⚠️ No recent pharmacy search. Send *PHARMACY* first.`);
         return;
       }
-      ratingService.addPharmacyRating(pharmacies[idx].osm_id || pharmacies[idx].name, parseInt(ratePharmMatch[2]), ratePharmMatch[3] || '', from);
-      await sendMessage(from, `✅ Your ${ratePharmMatch[2]}⭐ rating for *${pharmacies[idx].name}* has been saved.`);
+      const pharmacy = pharmacies[idx];
+      ratingService.ratePharmacy(from, pharmacy.osm_id || pharmacy.name, pharmacy.name, stars, comment);
+      await sendMessage(from, `✅ Your ${stars}⭐ rating for *${pharmacy.name}* has been saved.`);
       return;
     }
 
+    // RATINGS — e.g. RATINGS A4-1234
     const ratingsMatch = body.toUpperCase().match(/^RATINGS ([A-Z0-9]{1,4}-\d{2,7}[A-Z]?)$/);
     if (ratingsMatch) {
-      const ratings = ratingService.getRatings(ratingsMatch[1]);
+      const nafdacNo = ratingsMatch[1];
+      const ratings = ratingService.getDrugRatingSummary(nafdacNo);
       if (!ratings || ratings.count === 0) {
-        await sendMessage(from, `📊 No ratings yet for *${ratingsMatch[1]}*.\nBe first: *RATE DRUG ${ratingsMatch[1]} [1-5]*`);
+        await sendMessage(from, `📊 No ratings yet for *${nafdacNo}*.\nBe first: *RATE DRUG ${nafdacNo} [1-5]*`);
       } else {
         await sendMessage(from,
-          `📊 *Ratings: ${ratingsMatch[1]}*\n⭐ Average: ${ratings.average}/5\n🗳️ Votes: ${ratings.count}\n\n` +
-          (ratings.comments?.length ? `💬 Comments:\n${ratings.comments.slice(-3).map(c => `• ${c}`).join('\n')}` : '')
+          `📊 *Ratings: ${nafdacNo}*\n⭐ Average: ${ratings.average}/5\n🗳️ Votes: ${ratings.count}\n\n` +
+          (ratings.comments?.length ? `💬 Comments:\n${ratings.comments.slice(-3).map(c => `• ${c.comment}`).join('\n')}` : '')
         );
       }
       return;
     }
 
+    // REPORT by NAFDAC number
     const reportMatch = body.toUpperCase().match(/^REPORT ([A-Z0-9]{1,4}-\d{2,7}[A-Z]?)/);
     if (reportMatch) {
       reportService.addReport(reportMatch[1], from);
@@ -209,7 +219,7 @@ router.post('/', async (req, res) => {
     if (nafdacMatch) {
       const nafdacNo = nafdacMatch[1].toUpperCase();
       const drug = findDrug(nafdacNo);
-      const ratings = ratingService.getRatings(nafdacNo);
+      const ratings = ratingService.getDrugRatingSummary(nafdacNo);
       await sendMessage(from, drug ? verifiedMessage(drug, ratings) : notFoundMessage(nafdacNo));
       return;
     }
